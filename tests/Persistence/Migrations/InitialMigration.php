@@ -1,4 +1,5 @@
 <?php
+
 namespace Lhm\Tests\Persistence\Migrations;
 
 use Phinx\Migration\AbstractMigration;
@@ -16,7 +17,7 @@ class InitialMigration extends AbstractMigration
         'Fluttershy',
         'Rainbow Dash',
         'Blossomforth',
-        'Bulk Biceps'
+        'Bulk Biceps',
     ];
 
     public function up()
@@ -36,6 +37,5 @@ class InitialMigration extends AbstractMigration
 
     public function down()
     {
-
     }
 }

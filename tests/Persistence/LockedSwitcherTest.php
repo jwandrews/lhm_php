@@ -1,9 +1,12 @@
 <?php
+
 namespace Lhm\Tests\Persistence;
 
-use Lhm\LockedSwitcher;
 use Lhm\Invoker;
+use Lhm\LockedSwitcher;
+use Lhm\Table;
 use Lhm\Tests\Persistence\Migrations\InitialMigration;
+use Phinx\Db\Table as PhinxTable;
 
 /**
  * @see https://github.com/soundcloud/lhm/blob/b8819c550b1b471b563036276bbfffe5c990777d/lib/lhm/locked_switcher.rb#L9
@@ -17,7 +20,6 @@ use Lhm\Tests\Persistence\Migrations\InitialMigration;
  * a 'table not found' error. The second alter table is expected to be very
  * fast though because copytable is not visible to other transactions and so
  * there is no need to wait."
-
  */
 class LockedSwitcherTest extends AbstractPersistenceTest
 {
@@ -28,37 +30,39 @@ class LockedSwitcherTest extends AbstractPersistenceTest
     protected $switcher;
 
     /**
-     * @var Table
+     * @var PhinxTable
      */
     protected $origin;
     /**
-     * @var \Lhm\Table
+     * @var Table
      */
     protected $destination;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
 
         $this->adapter->execute("SET GLOBAL innodb_lock_wait_timeout=3");
         $this->adapter->execute("SET GLOBAL lock_wait_timeout=3");
 
-        $this->origin = new \Phinx\Db\Table('ponies');
+        $this->origin = new PhinxTable('ponies');
 
 
-        $migration = new InitialMigration(time());
+        $migration = new InitialMigration('test', time());
         $migration->setAdapter($this->adapter);
         $migration->up();
 
         $invoker = new Invoker($this->adapter, $this->origin);
 
         $this->destination = $invoker->temporaryTable();
-        $this->switcher = new LockedSwitcher($this->adapter, $this->origin, $this->destination);
+        $this->switcher    = new LockedSwitcher($this->adapter, $this->origin, $this->destination);
     }
 
     public function testRetryOnLockTimeouts()
     {
-        $this->markTestSkipped('Requires implementation of https://github.com/soundcloud/lhm/blob/b8819c550b1b471b563036276bbfffe5c990777d/spec/integration/integration_helper.rb#L91');
+        $this->markTestSkipped(
+            'Requires implementation of https://github.com/soundcloud/lhm/blob/b8819c550b1b471b563036276bbfffe5c990777d/spec/integration/integration_helper.rb#L91'
+        );
         //$this->switcher->setOption('retry_sleep_time', 0.3);
         //$this->switcher->run();
     }

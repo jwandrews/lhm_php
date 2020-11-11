@@ -1,4 +1,5 @@
 <?php
+
 namespace Lhm\Tests\Unit;
 
 use Lhm\SqlHelper;
@@ -12,13 +13,13 @@ class SqlHelperTest extends TestCase
      */
     protected $helper;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $adapter = $this->getMockBuilder(AdapterInterface::class)->getMock();
+        $adapter      = $this->getMockBuilder(AdapterInterface::class)->getMock();
         $this->helper = new SqlHelper($adapter);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         unset($this->helper);
         parent::tearDown();

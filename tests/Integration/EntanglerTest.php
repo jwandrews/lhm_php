@@ -3,9 +3,12 @@
 
 namespace Lhm\Tests\Integration;
 
+use Exception;
 use Lhm\Entangler;
 use Lhm\SqlHelper;
+use Lhm\Table;
 use Phinx\Db\Adapter\AdapterInterface;
+use Phinx\Db\Table as PhinxTable;
 use Phinx\Db\Table\Column;
 use PHPUnit\Framework\TestCase;
 
@@ -22,11 +25,11 @@ class EntanglerTest extends TestCase
      */
     protected $adapter;
     /**
-     * @var \Phinx\Db\Table
+     * @var PhinxTable
      */
     protected $origin;
     /**
-     * @var \Lhm\Table
+     * @var Table
      */
     protected $destination;
 
@@ -35,42 +38,8 @@ class EntanglerTest extends TestCase
      */
     protected $sqlHelper;
 
-    protected function setUp()
-    {
-        parent::setUp();
-
-        $this->adapter = $this->getMockBuilder(AdapterInterface::class)->getMock();
-        $this->adapter
-            ->expects($this->any())
-            ->method('quoteColumnName')
-            ->will($this->returnCallback(function ($name) {
-                return "`{$name}`";
-            }));
-
-        $this->adapter
-            ->expects($this->any())
-            ->method('quoteTableName')
-            ->will($this->returnCallback(function ($name) {
-                return "'{$name}'";
-            }));
-
-        $this->origin = $this->getMockBuilder(\Phinx\Db\Table::class)->disableOriginalConstructor()->getMock();
-        $this->destination = $this->getMockBuilder(\Lhm\Table::class)->disableOriginalConstructor()->getMock();
-
-        $this->sqlHelper = new SqlHelper($this->adapter);
-
-        $this->entangler = new MyEntangler($this->adapter, $this->origin, $this->destination, $this->sqlHelper);
-    }
-
-    protected function tearDown()
-    {
-        unset($this->entangler, $this->adapter, $this->origin, $this->destination, $this->sqlHelper);
-        parent::tearDown();
-    }
-
     public function testValidate_OriginNotFound()
     {
-
         $this->adapter
             ->expects($this->once())
             ->method('hasTable')
@@ -83,17 +52,15 @@ class EntanglerTest extends TestCase
             ->will($this->returnValue('users'));
 
         try {
-
             $this->entangler->validate();
             $this->fail();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->assertEquals('Table `users` does not exists.', $e->getMessage());
         }
     }
 
     public function testValidate_DestinationNotFound()
     {
-
         $this->adapter
             ->expects($this->atLeastOnce())
             ->method('hasTable')
@@ -112,7 +79,7 @@ class EntanglerTest extends TestCase
         try {
             $this->entangler->validate();
             $this->fail();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->assertEquals('Table `users_new` does not exists.', $e->getMessage());
         }
     }
@@ -123,7 +90,7 @@ class EntanglerTest extends TestCase
         $originColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $originColumns[0]->setName('id');
         $originColumns[1]->setName('name');
@@ -133,7 +100,7 @@ class EntanglerTest extends TestCase
         $destinationColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $destinationColumns[0]->setName('id');
         $destinationColumns[1]->setName('name');
@@ -168,36 +135,49 @@ class EntanglerTest extends TestCase
         $expectations = [
             "SELECT `COLUMN_NAME` FROM `information_schema`.`COLUMNS` WHERE (`TABLE_SCHEMA` = '') AND (`TABLE_NAME` = 'users') AND (`COLUMN_KEY` = 'PRI');",
 
-            implode("\n ", [
-                'CREATE TRIGGER lhmt_delete_users',
-                "AFTER DELETE ON 'users' FOR EACH ROW",
-                "DELETE IGNORE FROM 'users_new' /* large hadron migration (php) */",
-                "WHERE 'users_new'.`id` = OLD.`id` /* large hadron migration (php) */"
-            ]),
-            implode("\n ", [
-                'CREATE TRIGGER lhmt_insert_users',
-                "AFTER INSERT ON 'users' FOR EACH ROW",
-                "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
-                'VALUES (NEW.`id`,NEW.`name`) /* large hadron migration (php) */'
-            ]),
-            implode("\n ", [
-                'CREATE TRIGGER lhmt_update_users',
-                "AFTER UPDATE ON 'users' FOR EACH ROW",
-                "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
-                'VALUES (NEW.`id`,NEW.`name`) /* large hadron migration (php) */'
-            ])
+            implode(
+                "\n ",
+                [
+                    'CREATE TRIGGER lhmt_delete_users',
+                    "AFTER DELETE ON 'users' FOR EACH ROW",
+                    "DELETE IGNORE FROM 'users_new' /* large hadron migration (php) */",
+                    "WHERE 'users_new'.`id` = OLD.`id` /* large hadron migration (php) */",
+                ]
+            ),
+            implode(
+                "\n ",
+                [
+                    'CREATE TRIGGER lhmt_insert_users',
+                    "AFTER INSERT ON 'users' FOR EACH ROW",
+                    "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
+                    'VALUES (NEW.`id`,NEW.`name`) /* large hadron migration (php) */',
+                ]
+            ),
+            implode(
+                "\n ",
+                [
+                    'CREATE TRIGGER lhmt_update_users',
+                    "AFTER UPDATE ON 'users' FOR EACH ROW",
+                    "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
+                    'VALUES (NEW.`id`,NEW.`name`) /* large hadron migration (php) */',
+                ]
+            ),
         ];
 
         $matcher = $this->atLeastOnce();
         $this->adapter
             ->expects($matcher)
             ->method('query')
-            ->will($this->returnCallback(function ($query) use ($matcher, &$expectations) {
-                $this->assertEquals($expectations[$matcher->getInvocationCount() - 1], $query);
-                if ($matcher->getInvocationCount() === 1) {
-                    return 'id';
-                }
-            }));
+            ->will(
+                $this->returnCallback(
+                    function ($query) use ($matcher, &$expectations) {
+                        $this->assertEquals($expectations[$matcher->getInvocationCount() - 1], $query);
+                        if ($matcher->getInvocationCount() === 1) {
+                            return 'id';
+                        }
+                    }
+                )
+            );
 
         $this->entangler->before();
     }
@@ -212,16 +192,20 @@ class EntanglerTest extends TestCase
         $expectations = [
             'DROP TRIGGER IF EXISTS lhmt_delete_users /* large hadron migration (php) */',
             'DROP TRIGGER IF EXISTS lhmt_insert_users /* large hadron migration (php) */',
-            'DROP TRIGGER IF EXISTS lhmt_update_users /* large hadron migration (php) */'
+            'DROP TRIGGER IF EXISTS lhmt_update_users /* large hadron migration (php) */',
         ];
 
         $matcher = $this->atLeastOnce();
         $this->adapter
             ->expects($matcher)
             ->method('query')
-            ->will($this->returnCallback(function ($query) use ($matcher, &$expectations) {
-                $this->assertEquals($expectations[$matcher->getInvocationCount() - 1], $query);
-            }));
+            ->will(
+                $this->returnCallback(
+                    function ($query) use ($matcher, &$expectations) {
+                        $this->assertEquals($expectations[$matcher->getInvocationCount() - 1], $query);
+                    }
+                )
+            );
         $this->entangler->after();
     }
 
@@ -238,17 +222,20 @@ class EntanglerTest extends TestCase
             ->will($this->returnValue('users_new'));
 
         $this->adapter
-            ->expects( $this->once() )
+            ->expects($this->once())
             ->method('query')
             ->will($this->returnValue("id"));
 
         $this->assertEquals(
-            implode("\n ", [
-                'CREATE TRIGGER lhmt_delete_users',
-                "AFTER DELETE ON 'users' FOR EACH ROW",
-                "DELETE IGNORE FROM 'users_new' /* large hadron migration (php) */",
-                "WHERE 'users_new'.`id` = OLD.`id`"
-            ]),
+            implode(
+                "\n ",
+                [
+                    'CREATE TRIGGER lhmt_delete_users',
+                    "AFTER DELETE ON 'users' FOR EACH ROW",
+                    "DELETE IGNORE FROM 'users_new' /* large hadron migration (php) */",
+                    "WHERE 'users_new'.`id` = OLD.`id`",
+                ]
+            ),
             $this->entangler->createDeleteTrigger()
         );
     }
@@ -259,7 +246,7 @@ class EntanglerTest extends TestCase
         $originColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $originColumns[0]->setName('id');
         $originColumns[1]->setName('name');
@@ -269,7 +256,7 @@ class EntanglerTest extends TestCase
         $destinationColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $destinationColumns[0]->setName('id');
         $destinationColumns[1]->setName('name');
@@ -301,12 +288,15 @@ class EntanglerTest extends TestCase
             ->will($this->returnValue([]));
 
         $this->assertEquals(
-            implode("\n ", [
-                'CREATE TRIGGER lhmt_insert_users',
-                "AFTER INSERT ON 'users' FOR EACH ROW",
-                "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
-                'VALUES (NEW.`id`,NEW.`name`)'
-            ]),
+            implode(
+                "\n ",
+                [
+                    'CREATE TRIGGER lhmt_insert_users',
+                    "AFTER INSERT ON 'users' FOR EACH ROW",
+                    "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
+                    'VALUES (NEW.`id`,NEW.`name`)',
+                ]
+            ),
             $this->entangler->createInsertTrigger()
         );
     }
@@ -317,7 +307,7 @@ class EntanglerTest extends TestCase
         $originColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $originColumns[0]->setName('id');
         $originColumns[1]->setName('name');
@@ -327,7 +317,7 @@ class EntanglerTest extends TestCase
         $destinationColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $destinationColumns[0]->setName('id');
         $destinationColumns[1]->setName('name');
@@ -359,12 +349,15 @@ class EntanglerTest extends TestCase
             ->will($this->returnValue([]));
 
         $this->assertEquals(
-            implode("\n ", [
-                'CREATE TRIGGER lhmt_update_users',
-                "AFTER UPDATE ON 'users' FOR EACH ROW",
-                "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
-                'VALUES (NEW.`id`,NEW.`name`)'
-            ]),
+            implode(
+                "\n ",
+                [
+                    'CREATE TRIGGER lhmt_update_users',
+                    "AFTER UPDATE ON 'users' FOR EACH ROW",
+                    "REPLACE INTO 'users_new' (`id`,`name`) /* large hadron migration (php) */",
+                    'VALUES (NEW.`id`,NEW.`name`)',
+                ]
+            ),
             $this->entangler->createUpdateTrigger()
         );
     }
@@ -376,6 +369,47 @@ class EntanglerTest extends TestCase
             ->method('getName')
             ->will($this->returnValue('avatars'));
         $this->assertEquals('lhmt_test_avatars', $this->entangler->trigger('test'));
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->adapter = $this->getMockBuilder(AdapterInterface::class)->getMock();
+        $this->adapter
+            ->expects($this->any())
+            ->method('quoteColumnName')
+            ->will(
+                $this->returnCallback(
+                    function ($name) {
+                        return "`{$name}`";
+                    }
+                )
+            );
+
+        $this->adapter
+            ->expects($this->any())
+            ->method('quoteTableName')
+            ->will(
+                $this->returnCallback(
+                    function ($name) {
+                        return "'{$name}'";
+                    }
+                )
+            );
+
+        $this->origin      = $this->getMockBuilder(PhinxTable::class)->disableOriginalConstructor()->getMock();
+        $this->destination = $this->getMockBuilder(Table::class)->disableOriginalConstructor()->getMock();
+
+        $this->sqlHelper = new SqlHelper($this->adapter);
+
+        $this->entangler = new MyEntangler($this->adapter, $this->origin, $this->destination, $this->sqlHelper);
+    }
+
+    protected function tearDown(): void
+    {
+        unset($this->entangler, $this->adapter, $this->origin, $this->destination, $this->sqlHelper);
+        parent::tearDown();
     }
 }
 

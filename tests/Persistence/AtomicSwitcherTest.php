@@ -1,11 +1,12 @@
 <?php
+
 namespace Lhm\Tests\Persistence;
 
 use Lhm\AtomicSwitcher;
 use Lhm\Invoker;
-use Lhm\Tests\Persistence\AbstractPersistenceTest;
+use Lhm\Table;
 use Lhm\Tests\Persistence\Migrations\InitialMigration;
-use Phinx\Db\Table;
+use Phinx\Db\Table as PhinxTable;
 
 class AtomicSwitcherTest extends AbstractPersistenceTest
 {
@@ -16,37 +17,40 @@ class AtomicSwitcherTest extends AbstractPersistenceTest
     protected $switcher;
 
     /**
-     * @var Table
+     * @var PhinxTable
      */
     protected $origin;
+
     /**
      * @var Table
      */
     protected $destination;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
 
         $this->adapter->execute("SET GLOBAL innodb_lock_wait_timeout=3");
         $this->adapter->execute("SET GLOBAL lock_wait_timeout=3");
 
-        $this->origin = new Table('ponies');
+        $this->origin = new PhinxTable('ponies');
 
 
-        $migration = new InitialMigration(time());
+        $migration = new InitialMigration('test', time());
         $migration->setAdapter($this->adapter);
         $migration->up();
 
         $invoker = new Invoker($this->adapter, $this->origin);
 
         $this->destination = $invoker->temporaryTable();
-        $this->switcher = new AtomicSwitcher($this->adapter, $this->origin, $this->destination);
+        $this->switcher    = new AtomicSwitcher($this->adapter, $this->origin, $this->destination);
     }
 
     public function testRetryOnLockTimeouts()
     {
-        $this->markTestSkipped('Requires implementation of https://github.com/soundcloud/lhm/blob/b8819c550b1b471b563036276bbfffe5c990777d/spec/integration/integration_helper.rb#L91');
+        $this->markTestSkipped(
+            'Requires implementation of https://github.com/soundcloud/lhm/blob/b8819c550b1b471b563036276bbfffe5c990777d/spec/integration/integration_helper.rb#L91'
+        );
         //$this->switcher->setOption('retry_sleep_time', 0.3);
         //$this->switcher->run();
     }

@@ -10,6 +10,7 @@ env:
     - COMPOSER_PACKAGES='symfony/console=^2.0 symfony/event-dispatcher=^2.0 symfony/monolog-bridge=^2.0'
     - COMPOSER_PACKAGES='symfony/console=^3.0 symfony/event-dispatcher=^3.0 symfony/monolog-bridge=^3.0'
     - COMPOSER_PACKAGES='symfony/console=^4.0 symfony/event-dispatcher=^4.0 symfony/monolog-bridge=^4.0'
+    - COMPOSER_PACKAGES='symfony/console=^5.0 symfony/event-dispatcher=^5.0 symfony/monolog-bridge=^5.0'
 
 matrix:
   exclude:

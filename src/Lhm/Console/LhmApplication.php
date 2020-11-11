@@ -19,8 +19,10 @@ class LhmApplication extends Application
     {
         parent::__construct('Large Hadron Migrator', $version);
 
-        $this->addCommands([
-            new Command\Cleanup()
-        ]);
+        $this->addCommands(
+            [
+                new Command\Cleanup(),
+            ]
+        );
     }
 }

@@ -1,8 +1,11 @@
 <?php
+
 namespace Lhm\Tests\Integration;
 
 use Lhm\AtomicSwitcher;
+use Lhm\Table;
 use Phinx\Db\Adapter\AdapterInterface;
+use Phinx\Db\Table as PhinxTable;
 use PHPUnit\Framework\TestCase;
 
 class AtomicSwitcherTest extends TestCase
@@ -17,7 +20,7 @@ class AtomicSwitcherTest extends TestCase
      */
     protected $adapter;
     /**
-     * @var Table
+     * @var PhinxTable
      */
     protected $origin;
     /**
@@ -25,31 +28,35 @@ class AtomicSwitcherTest extends TestCase
      */
     protected $destination;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
         $this->adapter = $this->getMockBuilder(AdapterInterface::class)->getMock();
         $this->adapter
             ->expects($this->any())
             ->method('quoteColumnName')
-            ->will($this->returnCallback(function ($name) {
-                return "`{$name}`";
-            }));
+            ->will(
+                $this->returnCallback(
+                    function ($name) {
+                        return "`{$name}`";
+                    }
+                )
+            );
 
-        $this->origin = $this->getMockBuilder(\Phinx\Db\Table::class)->disableOriginalConstructor()->getMock();
-        $this->destination = $this->getMockBuilder(\Lhm\Table::class)->disableOriginalConstructor()->getMock();
+        $this->origin      = $this->getMockBuilder(PhinxTable::class)->disableOriginalConstructor()->getMock();
+        $this->destination = $this->getMockBuilder(Table::class)->disableOriginalConstructor()->getMock();
 
         $this->switcher = new AtomicSwitcher(
             $this->adapter,
             $this->origin,
             $this->destination,
             [
-                'archive_name' => 'users_archive'
+                'archive_name' => 'users_archive',
             ]
         );
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         unset($this->switcher, $this->adapter, $this->origin, $this->destination);
         parent::tearDown();
@@ -58,7 +65,6 @@ class AtomicSwitcherTest extends TestCase
 
     public function test()
     {
-
         $this->adapter
             ->expects($this->atLeastOnce())
             ->method('hasTable')
@@ -67,9 +73,13 @@ class AtomicSwitcherTest extends TestCase
         $this->adapter
             ->expects($this->atLeastOnce())
             ->method('quoteTableName')
-            ->will($this->returnCallback(function ($name) {
-                return "`{$name}`";
-            }));
+            ->will(
+                $this->returnCallback(
+                    function ($name) {
+                        return "`{$name}`";
+                    }
+                )
+            );
 
         $this->adapter
             ->expects($this->once())

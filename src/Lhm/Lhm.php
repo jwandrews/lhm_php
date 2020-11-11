@@ -50,24 +50,24 @@ class Lhm
     }
 
     /**
-     * @param $name
+     * @param          $name
      * @param callable $operations
-     * @param array $options
-     *                      - `stride` integer
+     * @param array    $options
+     *                          - `stride` integer
      *                          Size of a chunk (defaults to 2000)
-     *                      - `atomic_switch` boolean
+     *                          - `atomic_switch` boolean
      *                          Enable atomic switching (defaults to true)
-     *                      - `retry_sleep_time` integer
+     *                          - `retry_sleep_time` integer
      *                          How long should the switch wait until retrying ( defaults to 10 )
-     *                      - `max_retries` integer
+     *                          - `max_retries` integer
      *                          How many times the switch should be attempted ( defaults to 600 )
-     *                      - `archive_name` string
+     *                          - `archive_name` string
      *                          Name of the archive table ( defaults to 'lhma_' . gmdate('Y_m_d_H_i_s') . "_{$origin->getName()}" )
      *
      */
     public static function changeTable($name, callable $operations, array $options = [])
     {
-        if (!static::getAdapter()) {
+        if ( ! static::getAdapter()) {
             throw new \RuntimeException(__CLASS__ . ' must have an adapter set. Call ' . __CLASS__ . '::setAdapter()');
         }
 
@@ -79,7 +79,7 @@ class Lhm
     /**
      * Cleanup LHM temporary tables, old archives and triggers.
      *
-     * @param bool $run When set to `false` the cleanup operations will not be executed. ( dry-run )
+     * @param bool  $run    When set to `false` the cleanup operations will not be executed. ( dry-run )
      * @param array $options
      *                      - `until` \DateTime Archives older than this date will be deleted.
      *
@@ -87,7 +87,7 @@ class Lhm
      */
     public static function cleanup($run = false, array $options = [])
     {
-        if (!static::getAdapter()) {
+        if ( ! static::getAdapter()) {
             throw new \RuntimeException(__CLASS__ . ' must have an adapter. Call ' . __CLASS__ . '::setAdapter()');
         }
 
@@ -95,7 +95,7 @@ class Lhm
 
         $options += ['until' => false];
 
-        if ($options['until'] && !($options['until'] instanceof \DateTime)) {
+        if ($options['until'] && ! ($options['until'] instanceof \DateTime)) {
             throw new \UnexpectedValueException('The `until` option must be an instance of \DateTime');
         }
 
@@ -104,7 +104,7 @@ class Lhm
 
         $lhmTables = [];
         while (($table = $statement->fetchColumn(0)) !== false) {
-            if (!preg_match('/^lhm(a|n)_/', $table)) {
+            if ( ! preg_match('/^lhm(a|n)_/', $table)) {
                 continue;
             }
             $lhmTables[] = $table;
@@ -114,7 +114,11 @@ class Lhm
             $tablesToClean = [];
 
             foreach ($lhmTables as $table) {
-                if (!preg_match("/^lhma_([0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{2}_[0-9]{2}_[0-9]{2})_/", $table, $matches)) {
+                if ( ! preg_match(
+                    "/^lhma_([0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{2}_[0-9]{2}_[0-9]{2})_/",
+                    $table,
+                    $matches
+                )) {
                     continue;
                 }
 
@@ -134,7 +138,7 @@ class Lhm
         /** @var \PDOStatement $statement */
         $statement = static::getAdapter()->query('show triggers');
         while (($trigger = $statement->fetchColumn(0)) !== false) {
-            if (!preg_match('/^lhmt/', $trigger)) {
+            if ( ! preg_match('/^lhmt/', $trigger)) {
                 continue;
             }
             $lhmTriggers[] = $trigger;
@@ -163,7 +167,7 @@ class Lhm
 
             return true;
         } else {
-            $tables = implode(", ", $lhmTables);
+            $tables   = implode(", ", $lhmTables);
             $triggers = implode(", ", $lhmTriggers);
             $logger->info("Existing LHM backup tables: {$tables}");
             $logger->info("Existing LHM triggers: {$triggers}");

@@ -4,6 +4,8 @@
 namespace Lhm;
 
 
+use Phinx\Db\Table as PhinxTable;
+
 class Intersection
 {
 
@@ -22,12 +24,12 @@ class Intersection
     protected $renames;
 
     /**
-     * @param \Phinx\Db\Table $origin
-     * @param \Lhm\Table $destination
+     * @param PhinxTable $origin
+     * @param Table      $destination
      */
-    public function __construct(\Phinx\Db\Table $origin, \Lhm\Table $destination)
+    public function __construct(PhinxTable $origin, Table $destination)
     {
-        $this->origin = $origin;
+        $this->origin      = $origin;
         $this->destination = $destination;
     }
 
@@ -42,20 +44,11 @@ class Intersection
     /**
      * @return array
      */
-    public function destination()
-    {
-        return array_merge($this->common(), array_values($this->destination->getRenamedColumns()));
-    }
-
-    /**
-     * @return array
-     */
     public function common()
     {
         $origin = [];
         foreach ($this->origin->getColumns() as $column) {
             $origin[] = $column->getName();
-
         }
 
         $destination = [];
@@ -68,5 +61,13 @@ class Intersection
         sort($intersection);
 
         return $intersection;
+    }
+
+    /**
+     * @return array
+     */
+    public function destination()
+    {
+        return array_merge($this->common(), array_values($this->destination->getRenamedColumns()));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Lhm;
 
+use PDOStatement;
 use Phinx\Db\Adapter\AdapterInterface;
 
 
@@ -28,6 +29,7 @@ class SqlHelper
 
     /**
      * @param string $statement
+     *
      * @return string
      */
     public function tagged($statement)
@@ -40,7 +42,7 @@ class SqlHelper
      */
     public function versionString()
     {
-        /** @var \PDOStatement $data */
+        /** @var PDOStatement $data */
         $data = $this->adapter->query("show variables like 'version'");
 
         return $data->fetchColumn(1);
@@ -50,24 +52,28 @@ class SqlHelper
      * Extract the primary key of a table.
      *
      * @param \Phinx\Db\Table $table
+     *
      * @return string
      */
     public function extractPrimaryKey(\Phinx\Db\Table $table)
     {
-        $tableName = $table->getName();
+        $tableName    = $table->getName();
         $databaseName = $this->adapter->getOption('name');
 
-        $query = implode(" ", [
-            'SELECT `COLUMN_NAME`',
-            'FROM `information_schema`.`COLUMNS`',
-            "WHERE (`TABLE_SCHEMA` = '{$databaseName}')",
-            "AND (`TABLE_NAME` = '{$tableName}')",
-            "AND (`COLUMN_KEY` = 'PRI');"
-        ]);
+        $query = implode(
+            " ",
+            [
+                'SELECT `COLUMN_NAME`',
+                'FROM `information_schema`.`COLUMNS`',
+                "WHERE (`TABLE_SCHEMA` = '{$databaseName}')",
+                "AND (`TABLE_NAME` = '{$tableName}')",
+                "AND (`COLUMN_KEY` = 'PRI');",
+            ]
+        );
 
         $result = $this->adapter->query($query);
 
-        if ($result instanceof \PDOStatement) {
+        if ($result instanceof PDOStatement) {
             return $result->fetchColumn(0);
         }
 
@@ -80,7 +86,8 @@ class SqlHelper
 
     /**
      * @param string $type
-     * @param array $columns List of column names
+     * @param array  $columns List of column names
+     *
      * @return array
      */
     public function typedColumns($type, array $columns)
@@ -96,6 +103,7 @@ class SqlHelper
 
     /**
      * @param string $column
+     *
      * @return string
      */
     public function quoteColumn($column)
@@ -105,6 +113,7 @@ class SqlHelper
 
     /**
      * @param array $columns List of column names
+     *
      * @return array
      */
     public function quoteColumns(array $columns)
@@ -132,7 +141,7 @@ class SqlHelper
     {
         $version = $this->versionString();
 
-        list($major, $minor, $tiny) = array_map('intval', explode('.', $version));
+        [$major, $minor, $tiny] = array_map('intval', explode('.', $version));
 
         switch ($major) {
             case 4:

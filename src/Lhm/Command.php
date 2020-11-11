@@ -3,6 +3,7 @@
 namespace Lhm;
 
 
+use Exception;
 use Psr\Log\LoggerInterface;
 
 class Command
@@ -14,8 +15,9 @@ class Command
     protected $logger;
 
     /**
-     * @param callable $callable
-     * @throws \Exception
+     * @param callable|null $callable $callable
+     *
+     * @throws Exception
      */
     public function run(callable $callable = null)
     {
@@ -31,7 +33,7 @@ class Command
             } else {
                 $this->execute();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // TODO log
             $this->revert();
             throw $e;
@@ -64,7 +66,7 @@ class Command
 
     protected function execute()
     {
-        throw new \Exception("Not implemented");
+        throw new Exception("Not implemented");
     }
 
     /**

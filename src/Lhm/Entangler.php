@@ -3,6 +3,8 @@
 namespace Lhm;
 
 use Phinx\Db\Adapter\AdapterInterface;
+use Phinx\Db\Table as PhinxTable;
+use RuntimeException;
 
 /**
  * Entangler links the origin table to the destination.
@@ -37,18 +39,23 @@ class Entangler extends Command
     protected $intersection;
 
     /**
-     * @param AdapterInterface $adapter
-     * @param \Phinx\Db\Table $origin
-     * @param Table $destination
-     * @param SqlHelper $sqlHelper
-     * @param Intersection $intersection
+     * @param AdapterInterface  $adapter
+     * @param PhinxTable        $origin
+     * @param Table             $destination
+     * @param SqlHelper|null    $sqlHelper
+     * @param Intersection|null $intersection
      */
-    public function __construct(AdapterInterface $adapter, \Phinx\Db\Table $origin, \Lhm\Table $destination, SqlHelper $sqlHelper = null, Intersection $intersection = null)
-    {
-        $this->adapter = $adapter;
-        $this->origin = $origin;
-        $this->destination = $destination;
-        $this->sqlHelper = $sqlHelper ?: new SqlHelper($this->adapter);
+    public function __construct(
+        AdapterInterface $adapter,
+        PhinxTable $origin,
+        Table $destination,
+        SqlHelper $sqlHelper = null,
+        Intersection $intersection = null
+    ) {
+        $this->adapter      = $adapter;
+        $this->origin       = $origin;
+        $this->destination  = $destination;
+        $this->sqlHelper    = $sqlHelper ?: new SqlHelper($this->adapter);
         $this->intersection = $intersection ?: new Intersection($this->origin, $this->destination);
     }
 
@@ -60,21 +67,6 @@ class Entangler extends Command
         foreach ($this->entangle() as $statement) {
             $this->adapter->query($this->sqlHelper->tagged($statement));
         }
-    }
-
-    /**
-     * Executes required after migration statements
-     */
-    protected function after()
-    {
-        foreach ($this->untangle() as $statement) {
-            $this->adapter->query($this->sqlHelper->tagged($statement));
-        }
-    }
-
-    protected function revert()
-    {
-        $this->after();
     }
 
     /**
@@ -90,15 +82,41 @@ class Entangler extends Command
     }
 
     /**
-     * @return array
+     * @return string
      */
-    protected function untangle()
+    protected function createDeleteTrigger()
     {
-        return [
-            "DROP TRIGGER IF EXISTS {$this->trigger('delete')}",
-            "DROP TRIGGER IF EXISTS {$this->trigger('insert')}",
-            "DROP TRIGGER IF EXISTS {$this->trigger('update')}",
-        ];
+        $name = $this->trigger('delete');
+
+        $primaryKey = $this->sqlHelper->extractPrimaryKey($this->origin);
+        if (empty($primaryKey)) {
+            throw new RuntimeException("Table `{$this->origin->getName()}` does not have a primary key.");
+        }
+
+        $primaryKey = $this->sqlHelper->quoteColumn($primaryKey);
+
+        $originName      = $this->adapter->quoteTableName($this->origin->getName());
+        $destinationName = $this->adapter->quoteTableName($this->destination->getName());
+
+        return implode(
+            "\n ",
+            [
+                "CREATE TRIGGER {$name}",
+                "AFTER DELETE ON {$originName} FOR EACH ROW",
+                "DELETE IGNORE FROM {$destinationName} {$this->sqlHelper->annotation()}",
+                "WHERE {$destinationName}.{$primaryKey} = OLD.{$primaryKey}",
+            ]
+        );
+    }
+
+    /**
+     * @param string $type
+     *
+     * @return string
+     */
+    protected function trigger($type)
+    {
+        return "lhmt_{$type}_{$this->origin->getName()}";
     }
 
     /**
@@ -125,15 +143,18 @@ class Entangler extends Command
 
         $name = $this->trigger('insert');
 
-        $originName = $this->adapter->quoteTableName($this->origin->getName());
+        $originName      = $this->adapter->quoteTableName($this->origin->getName());
         $destinationName = $this->adapter->quoteTableName($this->destination->getName());
 
-        return implode("\n ", [
-            "CREATE TRIGGER {$name}",
-            "AFTER INSERT ON {$originName} FOR EACH ROW",
-            "REPLACE INTO {$destinationName} ({$destinationColumns}) {$this->sqlHelper->annotation()}",
-            "VALUES ({$originColumns})"
-        ]);
+        return implode(
+            "\n ",
+            [
+                "CREATE TRIGGER {$name}",
+                "AFTER INSERT ON {$originName} FOR EACH ROW",
+                "REPLACE INTO {$destinationName} ({$destinationColumns}) {$this->sqlHelper->annotation()}",
+                "VALUES ({$originColumns})",
+            ]
+        );
     }
 
     /**
@@ -160,62 +181,58 @@ class Entangler extends Command
 
         $name = $this->trigger('update');
 
-        $originName = $this->adapter->quoteTableName($this->origin->getName());
+        $originName      = $this->adapter->quoteTableName($this->origin->getName());
         $destinationName = $this->adapter->quoteTableName($this->destination->getName());
 
-        return implode("\n ", [
-            "CREATE TRIGGER {$name}",
-            "AFTER UPDATE ON {$originName} FOR EACH ROW",
-            "REPLACE INTO {$destinationName} ({$destinationColumns}) {$this->sqlHelper->annotation()}",
-            "VALUES ({$originColumns})"
-        ]);
+        return implode(
+            "\n ",
+            [
+                "CREATE TRIGGER {$name}",
+                "AFTER UPDATE ON {$originName} FOR EACH ROW",
+                "REPLACE INTO {$destinationName} ({$destinationColumns}) {$this->sqlHelper->annotation()}",
+                "VALUES ({$originColumns})",
+            ]
+        );
     }
 
-    /**
-     * @return string
-     */
-    protected function createDeleteTrigger()
+    protected function revert()
     {
-        $name = $this->trigger('delete');
-
-        $primaryKey = $this->sqlHelper->extractPrimaryKey($this->origin);
-        if (empty($primaryKey)) {
-            throw new \RuntimeException("Table `{$this->origin->getName()}` does not have a primary key.");
-        }
-
-        $primaryKey = $this->sqlHelper->quoteColumn($primaryKey);
-
-        $originName = $this->adapter->quoteTableName($this->origin->getName());
-        $destinationName = $this->adapter->quoteTableName($this->destination->getName());
-
-        return implode("\n ", [
-            "CREATE TRIGGER {$name}",
-            "AFTER DELETE ON {$originName} FOR EACH ROW",
-            "DELETE IGNORE FROM {$destinationName} {$this->sqlHelper->annotation()}",
-            "WHERE {$destinationName}.{$primaryKey} = OLD.{$primaryKey}"
-        ]);
+        $this->after();
     }
 
     /**
-     * @throws \RuntimeException
+     * Executes required after migration statements
+     */
+    protected function after()
+    {
+        foreach ($this->untangle() as $statement) {
+            $this->adapter->query($this->sqlHelper->tagged($statement));
+        }
+    }
+
+    /**
+     * @return array
+     */
+    protected function untangle()
+    {
+        return [
+            "DROP TRIGGER IF EXISTS {$this->trigger('delete')}",
+            "DROP TRIGGER IF EXISTS {$this->trigger('insert')}",
+            "DROP TRIGGER IF EXISTS {$this->trigger('update')}",
+        ];
+    }
+
+    /**
+     * @throws RuntimeException
      */
     protected function validate()
     {
-        if (!$this->adapter->hasTable($this->origin->getName())) {
-            throw new \RuntimeException("Table `{$this->origin->getName()}` does not exists.");
+        if ( ! $this->adapter->hasTable($this->origin->getName())) {
+            throw new RuntimeException("Table `{$this->origin->getName()}` does not exists.");
         }
 
-        if (!$this->adapter->hasTable($this->destination->getName())) {
-            throw new \RuntimeException("Table `{$this->destination->getName()}` does not exists.");
+        if ( ! $this->adapter->hasTable($this->destination->getName())) {
+            throw new RuntimeException("Table `{$this->destination->getName()}` does not exists.");
         }
-    }
-
-    /**
-     * @param string $type
-     * @return string
-     */
-    protected function trigger($type)
-    {
-        return "lhmt_{$type}_{$this->origin->getName()}";
     }
 }

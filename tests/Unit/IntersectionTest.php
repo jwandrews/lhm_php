@@ -1,19 +1,22 @@
 <?php
+
 namespace tests\Unit;
 
 use Lhm\Intersection;
+use Lhm\Table;
+use Phinx\Db\Table as PhinxTable;
 use Phinx\Db\Table\Column;
 use PHPUnit\Framework\TestCase;
 
 class IntersectionTest extends TestCase
 {
     /**
-     * @var \Phinx\Db\Table
+     * @var PhinxTable
      */
     protected $origin;
 
     /**
-     * @var \Lhm\Table
+     * @var Table
      */
     protected $destination;
 
@@ -23,17 +26,17 @@ class IntersectionTest extends TestCase
     protected $intersection;
 
 
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
-        $this->origin = $this->getMockBuilder(\Phinx\Db\Table::class)->disableOriginalConstructor()->getMock();
-        $this->destination = $this->getMockBuilder(\Lhm\Table::class)->disableOriginalConstructor()->getMock();
+        $this->origin      = $this->getMockBuilder(PhinxTable::class)->disableOriginalConstructor()->getMock();
+        $this->destination = $this->getMockBuilder(Table::class)->disableOriginalConstructor()->getMock();
 
         /** @var Column[] $originColumns */
         $originColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $originColumns[0]->setName('id');
         $originColumns[1]->setName('name');
@@ -43,7 +46,7 @@ class IntersectionTest extends TestCase
         $destinationColumns = [
             new Column(),
             new Column(),
-            new Column()
+            new Column(),
         ];
         $destinationColumns[0]->setName('id');
         $destinationColumns[1]->setName('name');
@@ -62,7 +65,7 @@ class IntersectionTest extends TestCase
         $this->intersection = new Intersection($this->origin, $this->destination);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         unset($this->origin, $this->destination);
         parent::tearDown();
@@ -94,7 +97,8 @@ class IntersectionTest extends TestCase
         $this->assertEquals(['id', 'name'], $this->intersection->destination());
     }
 
-    public function testOrigin() {
+    public function testOrigin()
+    {
         $this->destination
             ->expects($this->atLeastOnce())
             ->method('getRenamedColumns')
@@ -103,7 +107,8 @@ class IntersectionTest extends TestCase
         $this->assertEquals(['id', 'name'], $this->intersection->origin());
     }
 
-    public function testOriginRenamed() {
+    public function testOriginRenamed()
+    {
         $this->destination
             ->expects($this->atLeastOnce())
             ->method('getRenamedColumns')

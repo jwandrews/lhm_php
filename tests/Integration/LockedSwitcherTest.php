@@ -1,8 +1,11 @@
 <?php
+
 namespace Lhm\Tests\Integration;
 
 use Lhm\LockedSwitcher;
+use Lhm\Table;
 use Phinx\Db\Adapter\AdapterInterface;
+use Phinx\Db\Table as PhinxTable;
 use PHPUnit\Framework\TestCase;
 
 class LockedSwitcherTest extends TestCase
@@ -17,7 +20,7 @@ class LockedSwitcherTest extends TestCase
      */
     protected $adapter;
     /**
-     * @var Table
+     * @var PhinxTable
      */
     protected $origin;
     /**
@@ -25,40 +28,8 @@ class LockedSwitcherTest extends TestCase
      */
     protected $destination;
 
-    protected function setUp()
-    {
-        parent::setUp();
-        $this->adapter = $this->getMockBuilder(AdapterInterface::class)->getMock();
-        $this->adapter
-            ->expects($this->any())
-            ->method('quoteColumnName')
-            ->will($this->returnCallback(function ($name) {
-                return "`{$name}`";
-            }));
-
-        $this->origin = $this->getMockBuilder(\Phinx\Db\Table::class)->disableOriginalConstructor()->getMock();
-        $this->destination = $this->getMockBuilder(\Lhm\Table::class)->disableOriginalConstructor()->getMock();
-
-        $this->switcher = new LockedSwitcher(
-            $this->adapter,
-            $this->origin,
-            $this->destination,
-            [
-                'archive_name' => 'users_archive'
-            ]
-        );
-    }
-
-    protected function tearDown()
-    {
-        unset($this->switcher, $this->adapter, $this->origin, $this->destination);
-        parent::tearDown();
-    }
-
-
     public function test()
     {
-
         $this->adapter
             ->expects($this->atLeastOnce())
             ->method('hasTable')
@@ -67,9 +38,13 @@ class LockedSwitcherTest extends TestCase
         $this->adapter
             ->expects($this->atLeastOnce())
             ->method('quoteTableName')
-            ->will($this->returnCallback(function ($name) {
-                return "`{$name}`";
-            }));
+            ->will(
+                $this->returnCallback(
+                    function ($name) {
+                        return "`{$name}`";
+                    }
+                )
+            );
 
         $expected = [
             "set @lhm_auto_commit = @@session.autocommit /* large hadron migration (php) */",
@@ -79,15 +54,19 @@ class LockedSwitcherTest extends TestCase
             "ALTER TABLE `users_new` rename `users` /* large hadron migration (php) */",
             "COMMIT /* large hadron migration (php) */",
             "UNLOCK TABLES /* large hadron migration (php) */",
-            "set session autocommit = @lhm_auto_commit /* large hadron migration (php) */"
+            "set session autocommit = @lhm_auto_commit /* large hadron migration (php) */",
         ];
-        $matcher = $this->any();
+        $matcher  = $this->any();
         $this->adapter
             ->expects($matcher)
             ->method('query')
-            ->will($this->returnCallback(function ($query) use ($matcher, $expected) {
-                $this->assertEquals($expected[$matcher->getInvocationCount() - 1], $query);
-            }));
+            ->will(
+                $this->returnCallback(
+                    function ($query) use ($matcher, $expected) {
+                        $this->assertEquals($expected[$matcher->getInvocationCount() - 1], $query);
+                    }
+                )
+            );
 
         $this->origin
             ->expects($this->atLeastOnce())
@@ -100,5 +79,39 @@ class LockedSwitcherTest extends TestCase
             ->will($this->returnValue('users_new'));
 
         $this->switcher->run();
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->adapter = $this->getMockBuilder(AdapterInterface::class)->getMock();
+        $this->adapter
+            ->expects($this->any())
+            ->method('quoteColumnName')
+            ->will(
+                $this->returnCallback(
+                    function ($name) {
+                        return "`{$name}`";
+                    }
+                )
+            );
+
+        $this->origin      = $this->getMockBuilder(PhinxTable::class)->disableOriginalConstructor()->getMock();
+        $this->destination = $this->getMockBuilder(Table::class)->disableOriginalConstructor()->getMock();
+
+        $this->switcher = new LockedSwitcher(
+            $this->adapter,
+            $this->origin,
+            $this->destination,
+            [
+                'archive_name' => 'users_archive',
+            ]
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        unset($this->switcher, $this->adapter, $this->origin, $this->destination);
+        parent::tearDown();
     }
 }

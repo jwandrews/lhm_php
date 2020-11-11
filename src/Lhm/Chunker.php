@@ -3,6 +3,7 @@
 namespace Lhm;
 
 use Phinx\Db\Adapter\AdapterInterface;
+use Phinx\Db\Table as PhinxTable;
 
 
 class Chunker extends Command
@@ -50,38 +51,43 @@ class Chunker extends Command
 
     /**
      * @param AdapterInterface $adapter
-     * @param \Phinx\Db\Table $origin
-     * @param \Lhm\Table $destination
-     * @param SqlHelper $sqlHelper
-     * @param array $options
-     *                      - `stride`
+     * @param PhinxTable       $origin
+     * @param Table            $destination
+     * @param SqlHelper|null   $sqlHelper
+     * @param array            $options
+     *                          - `stride`
      *                          Size of chunk ( defaults to 2000 )
      */
-    public function __construct(AdapterInterface $adapter, \Phinx\Db\Table $origin, \Lhm\Table $destination, SqlHelper $sqlHelper = null, array $options = [])
-    {
-        $this->adapter = $adapter;
-        $this->origin = $origin;
+    public function __construct(
+        AdapterInterface $adapter,
+        PhinxTable $origin,
+        Table $destination,
+        SqlHelper $sqlHelper = null,
+        array $options = []
+    ) {
+        $this->adapter     = $adapter;
+        $this->origin      = $origin;
         $this->destination = $destination;
-        $this->sqlHelper = $sqlHelper ?: new SqlHelper($this->adapter);
+        $this->sqlHelper   = $sqlHelper ?: new SqlHelper($this->adapter);
 
         $this->options = $options + ['stride' => 2000];
 
         $this->primaryKey = $this->adapter->quoteColumnName($this->sqlHelper->extractPrimaryKey($this->origin));
 
         $this->nextToInsert = $this->start = $this->selectStart();
-        $this->limit = $this->selectLimit();
+        $this->limit        = $this->selectLimit();
 
         $this->intersection = new Intersection($this->origin, $this->destination);
     }
 
     protected function execute()
     {
-
-        $this->getLogger()->info("Copying data from `{$this->origin->getName()}` into `{$this->destination->getName()}`");
+        $this->getLogger()->info(
+            "Copying data from `{$this->origin->getName()}` into `{$this->destination->getName()}`"
+        );
 
 
         while ($this->nextToInsert < $this->limit || ($this->nextToInsert == 1 && $this->start == 1)) {
-
             $query = $this->copy($this->bottom(), $this->top($this->options['stride']));
 
             $this->getLogger()->debug($query);
@@ -89,8 +95,6 @@ class Chunker extends Command
             $this->adapter->query($query);
             $this->nextToInsert = $this->top($this->options['stride']) + 1;
         }
-
-
     }
 
     protected function top($stride)
@@ -105,7 +109,7 @@ class Chunker extends Command
 
     protected function selectStart()
     {
-        $name = $this->adapter->quoteTableName($this->origin->getName());
+        $name  = $this->adapter->quoteTableName($this->origin->getName());
         $start = $this->adapter->fetchRow("SELECT MIN({$this->primaryKey}) FROM {$name}")[0];
 
         return (int)$start;
@@ -113,7 +117,7 @@ class Chunker extends Command
 
     protected function selectLimit()
     {
-        $name = $this->adapter->quoteTableName($this->origin->getName());
+        $name  = $this->adapter->quoteTableName($this->origin->getName());
         $limit = $this->adapter->fetchRow("SELECT MAX({$this->primaryKey}) FROM {$name}")[0];
 
         return (int)$limit;
@@ -122,11 +126,12 @@ class Chunker extends Command
     /**
      * @param integer $lowest
      * @param integer $highest
+     *
      * @return string
      */
     protected function copy($lowest, $highest)
     {
-        $originName = $this->adapter->quoteTableName($this->origin->getName());
+        $originName      = $this->adapter->quoteTableName($this->origin->getName());
         $destinationName = $this->adapter->quoteTableName($this->destination->getName());
 
         $destinationColumns = implode(
@@ -143,10 +148,13 @@ class Chunker extends Command
         );
 
 
-        return implode(" ", [
-            "INSERT IGNORE INTO {$destinationName} ({$destinationColumns})",
-            "SELECT {$originColumns} FROM {$originName}",
-            "WHERE {$originName}.{$this->primaryKey} BETWEEN {$lowest} AND {$highest}"
-        ]);
+        return implode(
+            " ",
+            [
+                "INSERT IGNORE INTO {$destinationName} ({$destinationColumns})",
+                "SELECT {$originColumns} FROM {$originName}",
+                "WHERE {$originName}.{$this->primaryKey} BETWEEN {$lowest} AND {$highest}",
+            ]
+        );
     }
 }

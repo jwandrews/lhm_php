@@ -2,7 +2,12 @@
 
 namespace Lhm;
 
+use DateTime;
+use DateTimeZone;
+use Exception;
 use Phinx\Db\Adapter\AdapterInterface;
+use Phinx\Db\Table as PhinxTable;
+use RuntimeException;
 
 /**
  * Switched the origin table with the destination using an atomic rename.
@@ -16,12 +21,12 @@ class AtomicSwitcher extends Command
     protected $adapter;
 
     /**
-     * @var \Phinx\Db\Table
+     * @var PhinxTable
      */
     protected $origin;
 
     /**
-     * @var \Lhm\Table
+     * @var Table
      */
     protected $destination;
 
@@ -32,29 +37,38 @@ class AtomicSwitcher extends Command
 
     /**
      * @param AdapterInterface $adapter
-     * @param Table $origin
-     * @param Table $destination
-     * @param array $options Table options:
-     *                      - `retry_sleep_time`
-     *                      - `max_retries`
-     *                      - `archive_name`
+     * @param PhinxTable       $origin
+     * @param Table            $destination
+     * @param array            $options Table options:
+     *                                  - `retry_sleep_time`
+     *                                  - `max_retries`
+     *                                  - `archive_name`
+     *
+     * @throws Exception
      */
-    public function __construct(AdapterInterface $adapter, \Phinx\Db\Table $origin, \Lhm\Table $destination, array $options = [])
-    {
+    public function __construct(
+        AdapterInterface $adapter,
+        PhinxTable $origin,
+        Table $destination,
+        array $options = []
+    ) {
         // 0.234234234 234234234 -> [0.2323232 => 232322323]
         $micro = explode(' ', microtime());
         // 0.232323232 -> [0, 23232323232]
         $micro = explode('.', $micro[0]);
-        $start = new \DateTime('now', new \DateTimeZone('UTC'));
+        $start = new DateTime('now', new DateTimeZone('UTC'));
 
         $this->options = $options + [
                 'retry_sleep_time' => 10,
-                'max_retries' => 600,
-                'archive_name' => 'lhma_' . $start->format('Y_m_d_H_i_s') . '_' . sprintf('%03d', $micro[1] / 1000) . "_{$origin->getName()}"
+                'max_retries'      => 600,
+                'archive_name'     => 'lhma_' . $start->format('Y_m_d_H_i_s') . '_' . sprintf(
+                        '%03d',
+                        $micro[1] / 1000
+                    ) . "_{$origin->getName()}",
             ];
 
-        $this->adapter = $adapter;
-        $this->origin = $origin;
+        $this->adapter     = $adapter;
+        $this->origin      = $origin;
         $this->destination = $destination;
     }
 
@@ -68,8 +82,9 @@ class AtomicSwitcher extends Command
 
     /**
      * Set an option
+     *
      * @param string $name
-     * @param mixed $value
+     * @param mixed  $value
      */
     public function setOption($name, $value)
     {
@@ -81,7 +96,7 @@ class AtomicSwitcher extends Command
      */
     protected function statements()
     {
-        $originTableName = $this->adapter->quoteTableName($this->origin->getName());
+        $originTableName      = $this->adapter->quoteTableName($this->origin->getName());
         $destinationTableName = $this->adapter->quoteTableName($this->destination->getName());
 
         $archiveName = $this->adapter->quoteTableName($this->options['archive_name']);
@@ -92,15 +107,19 @@ class AtomicSwitcher extends Command
     }
 
     /**
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     protected function validate()
     {
-        if ($this->adapter->hasTable($this->origin->getName()) && $this->adapter->hasTable($this->destination->getName())) {
+        if ($this->adapter->hasTable($this->origin->getName()) && $this->adapter->hasTable(
+                $this->destination->getName()
+            )) {
             return;
         }
 
-        throw new \RuntimeException("Table `{$this->origin->getName()}` and `{$this->destination->getName()}` must exist.");
+        throw new RuntimeException(
+            "Table `{$this->origin->getName()}` and `{$this->destination->getName()}` must exist."
+        );
     }
 
 
@@ -116,14 +135,13 @@ class AtomicSwitcher extends Command
 
             try {
                 foreach ($this->statements() as $statement) {
-
                     $this->getLogger()->debug("Executing statement `{$statement}`");
 
                     $this->adapter->query($statement);
                 }
 
                 return;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 if ($this->shouldRetryException($e)) {
                     $this->getLogger()->warning($e->getMessage());
 
@@ -140,8 +158,12 @@ class AtomicSwitcher extends Command
 
     /**
      * Determine if the operation should be retried.
+     *
+     * @param Exception $e
+     *
+     * @return false|int
      */
-    protected function shouldRetryException(\Exception $e)
+    protected function shouldRetryException(Exception $e)
     {
         return preg_match('/Lock wait timeout exceeded/', $e->getMessage());
     }

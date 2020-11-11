@@ -1,4 +1,5 @@
 <?php
+
 namespace Lhm\Tests\Persistence\Migrations;
 
 use Lhm\Lhm;
@@ -15,11 +16,14 @@ class HybridPhinxMigration extends AbstractMigration
             ->save();
 
         Lhm::setAdapter($this->getAdapter());
-        Lhm::changeTable('ponies', function (Table $ponies) {
-            $ponies
-                ->addColumn('age', 'integer', ['null' => true])
-                ->save();
-        });
+        Lhm::changeTable(
+            'ponies',
+            function (Table $ponies) {
+                $ponies
+                    ->addColumn('age', 'integer', ['null' => true])
+                    ->save();
+            }
+        );
     }
 
     public function down()

@@ -3,10 +3,12 @@
 
 namespace Lhm;
 
+use Phinx\Db\Table as PhinxTable;
+
 /**
  * {@inheritdoc}
  */
-class Table extends \Phinx\Db\Table
+class Table extends PhinxTable
 {
     /**
      * @var array
@@ -15,6 +17,7 @@ class Table extends \Phinx\Db\Table
 
     /**
      * Return a list of columns that are being renamed.
+     *
      * @return array
      */
     public function getRenamedColumns()
