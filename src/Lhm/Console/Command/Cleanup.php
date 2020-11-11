@@ -4,10 +4,15 @@
 namespace Lhm\Console\Command;
 
 
+use DateTime;
+use DateTimeZone;
+use InvalidArgumentException;
 use Lhm\Lhm;
 use Monolog\Logger;
 use Phinx\Console\Command\AbstractCommand;
+use RuntimeException;
 use Symfony\Bridge\Monolog\Handler\ConsoleHandler;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -51,9 +56,9 @@ class Cleanup extends AbstractCommand
      * @param InputInterface  $input
      * @param OutputInterface $output
      *
-     * @return void
-     * @throws \InvalidArgumentException
-     * @throws \RuntimeException
+     * @return int
+     * @throws InvalidArgumentException
+     * @throws RuntimeException
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -85,10 +90,10 @@ class Cleanup extends AbstractCommand
         $until = $input->getOption('until');
 
         if ($until) {
-            $until = \DateTime::createFromFormat('Y-m-d_H:i:s', $until, new \DateTimeZone('UTC'));
+            $until = DateTime::createFromFormat('Y-m-d_H:i:s', $until, new DateTimeZone('UTC'));
 
             if ($until === false) {
-                throw new \InvalidArgumentException("The specified date in `until` is invalid.");
+                throw new InvalidArgumentException("The specified date in `until` is invalid.");
             }
         }
 
@@ -120,5 +125,7 @@ class Cleanup extends AbstractCommand
 
         Lhm::setAdapter($environment->getAdapter());
         Lhm::cleanup($run, $options);
+
+        return Command::SUCCESS;
     }
 }
